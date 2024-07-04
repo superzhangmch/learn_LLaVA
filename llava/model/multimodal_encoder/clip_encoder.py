@@ -33,7 +33,7 @@ class CLIPVisionTower(nn.Module):
         self.is_loaded = True
 
     def feature_select(self, image_forward_outs):
-        image_features = image_forward_outs.hidden_states[self.select_layer] # 默认用self.select_layer == -2。此处即对应paper中所说的用CLIP的最后一层还是倒数第二层。
+        image_features = image_forward_outs.hidden_states[self.select_layer] # 默认用self.select_layer == -2。此处即对应paper中所说的用CLIP的最后一层还是倒数第二层。CLIP是多层transformer结构的VIT，所以每层输出即为transformer层输出
         if self.select_feature == 'patch':
             image_features = image_features[:, 1:]
         elif self.select_feature == 'cls_patch':
@@ -89,7 +89,7 @@ class CLIPVisionTower(nn.Module):
 
 
 
-class CLIPVisionTowerS2(CLIPVisionTower): # for LLaVa1.5
+class CLIPVisionTowerS2(CLIPVisionTower): # for LLaVa1.5 怎样支持大图 S2指的是用到了【from s2wrapper import forward as multiscale_forward】
     def __init__(self, vision_tower, args, delay_load=False):
         super().__init__(vision_tower, args, delay_load)
 
@@ -100,7 +100,7 @@ class CLIPVisionTowerS2(CLIPVisionTower): # for LLaVa1.5
         self.s2_image_size = self.s2_scales[-1]
 
         try:
-            from s2wrapper import forward as multiscale_forward
+            from s2wrapper import forward as multiscale_forward # 来自https://github.com/bfshi/scaling_on_scales
         except ImportError:
             raise ImportError('Package s2wrapper not found! Please install by running: \npip install git+https://github.com/bfshi/scaling_on_scales.git')
         self.multiscale_forward = multiscale_forward
@@ -132,6 +132,10 @@ class CLIPVisionTowerS2(CLIPVisionTower): # for LLaVa1.5
 
     @torch.no_grad()
     def forward(self, images):
+        '''
+        这里用multiscale_forward方法，和LLaVa1.5中所述方法是不一样的。paper中大图切分成小图，则所有小图经Clip后直接给到LLM（小图的行位还要加一个特殊END token）, 因此visual tokens数是变的。
+        而用这里的multiscale_forward，看其代码，所输出的visual tokens并不变：原图切多块后每块经CLIP，但是会经过pooling操作把多子图的clip特征merge成一个。然后把它和原图的clip特征拼合，于是visual tokens数只是翻倍。
+        '''
         if type(images) is list:
             image_features = []
             for image in images:
