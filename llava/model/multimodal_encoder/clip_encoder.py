@@ -135,6 +135,13 @@ class CLIPVisionTowerS2(CLIPVisionTower): # for LLaVa1.5 怎样支持大图 S2�
         '''
         这里用multiscale_forward方法，和LLaVa1.5中所述方法是不一样的。paper中大图切分成小图，则所有小图经Clip后直接给到LLM（小图的行位还要加一个特殊END token）, 因此visual tokens数是变的。
         而用这里的multiscale_forward，看其代码，所输出的visual tokens并不变：原图切多块后每块经CLIP，但是会经过pooling操作把多子图的clip特征merge成一个。然后把它和原图的clip特征拼合，于是visual tokens数只是翻倍。
+
+        后来发现 s2wrapper作者把该功能加进的LLaVa：https://github.com/haotian-liu/LLaVA/pull/1376
+        What is S2?
+        S2 is a method to extract multi-scale features from an image. For example, given an image of 336x336, S2 interpolates the image to multiple scales such as 336x336, 672x672, 1008x1008, 
+        extracts features at each scale and merge the features into a multi-scale feature map. The multi-scale features contain more detailed information about an image which is beneficial for
+        Multimodal LLMs. Meanwhile, S2 ensures the number of visual token sent to LLM is the same as the regular single-scale features such that no computational overhead on LLM is incurred.
+        难怪和paper中所述不一致。上面这段话也说了，这样做，使得token 数得到了控制。
         '''
         if type(images) is list:
             image_features = []
