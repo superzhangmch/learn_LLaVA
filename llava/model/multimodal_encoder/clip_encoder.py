@@ -89,7 +89,7 @@ class CLIPVisionTower(nn.Module):
 
 
 
-class CLIPVisionTowerS2(CLIPVisionTower): # for LLaVa1.5 怎样支持大图 S2指的是用到了【from s2wrapper import forward as multiscale_forward】
+class CLIPVisionTowerS2(CLIPVisionTower): # 这里的S2指的是用到了【from s2wrapper import forward as multiscale_forward】
     def __init__(self, vision_tower, args, delay_load=False):
         super().__init__(vision_tower, args, delay_load)
 
@@ -133,16 +133,16 @@ class CLIPVisionTowerS2(CLIPVisionTower): # for LLaVa1.5 怎样支持大图 S2�
     @torch.no_grad()
     def forward(self, images):
         '''
-        这里用multiscale_forward方法，和LLaVa1.5中所述方法是不一样的。paper中大图切分成小图，则所有小图经Clip后直接给到LLM（小图的行位还要加一个特殊END token）, 因此visual tokens数是变的。
-        
-        而用这里的multiscale_forward，看其代码，所输出的visual tokens并不变：原图切多块后每块经CLIP，但是会经过pooling操作把多子图的clip特征merge成一个。然后把它和原图的clip特征拼合，于是visual tokens数只是翻倍。
+        这里只是把img encoder做了更改，使得能抽取并融合多scale的特征。和LLaVa1.5中的把图切成子图最后再拼接并flatten，工作在不同环节。并不冲突。
+    
+        这里的multiscale_forward，看其代码，所输出的visual tokens并不变：原图切多块后每块经CLIP，但是会经过pooling操作把多子图的clip特征merge成一个。然后把它和原图的clip特征拼合，于是visual tokens数不变，但是特征dim翻倍。
         后来发现是 s2wrapper 作者把该功能加进的LLaVa：https://github.com/haotian-liu/LLaVA/pull/1376
         What is S2? S2 is a method to extract multi-scale features from an image. For example, given an image of 336x336, S2 interpolates the image to multiple scales such as 336x336, 672x672, 1008x1008, 
         extracts features at each scale and merge the features into a multi-scale feature map. The multi-scale features contain more detailed information about an image which is beneficial for
         Multimodal LLMs. Meanwhile, S2 ensures the number of visual token sent to LLM is the same as the regular single-scale features such that no computational overhead on LLM is incurred.
-        难怪和paper中所述不一致。上面这段话也说了，这样做，使得token 数得到了控制。
 
-        另外https://llava-vl.github.io/blog/2024-04-30-llava-next-video/，可见paper中方法确实是把多个子图的clip特征的token直接给到LLM，从而visual token可能会较多（一个图就是(224/14)^2=256或336/14~576个）。
+        另外和LLaVa1.5中的把图切成子图最后再拼接并flatten法，见https://llava-vl.github.io/blog/2024-04-30-llava-next-video/，可见paper中方法确实是把多个子图的clip特征的token直接给到LLM，从而visual token可能会较多（一个图就是(224/14)^2=256或336/14~576个）。
+        
         '''
         if type(images) is list:
             image_features = []
